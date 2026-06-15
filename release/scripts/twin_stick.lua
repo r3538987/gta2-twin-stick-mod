@@ -11,6 +11,23 @@
 
 local exiting = false
 local special = false
+local pad_dpad_up = 0
+local pad_dpad_down = 1
+local pad_dpad_left = 2
+local pad_dpad_right = 3
+local pad_start = 4
+local pad_back = 5
+local pad_left_thumb = 6
+local pad_right_thumb = 7
+local pad_left_shoulder = 8
+local pad_right_shoulder = 9
+local pad_a = 10
+local pad_b = 11
+local pad_x = 12
+local pad_y = 13
+local pad_left_trigger = 14
+local pad_right_trigger = 15
+
 function manageXInputs(isInCar, isWalking)
 	local steeringThreshold = 0.5
 	local acceleratingThreshold = 0.3
@@ -19,22 +36,22 @@ function manageXInputs(isInCar, isWalking)
 		local input_status_right = ReadProcessMemory(0x5ecacd, 1)
 		local lX, lY, rX, rY = GetXInputAxes()
 		if(isInCar or special) then
-			if(IsXInputKeyPress(15) or (lY > 0.9)) then --up-forward
+			if(IsXInputKeyPress(pad_right_trigger) or (lY > 0.9)) then --up-forward
 				input_status_left = input_status_left | 0x01
 			else
 				input_status_left = input_status_left & 0xFE
 			end
-			if(IsXInputKeyPress(14) or (lY < -0.9)) then --down-backwards
+			if(IsXInputKeyPress(pad_left_trigger) or (lY < -0.9)) then --down-backwards
 				input_status_left = input_status_left | 0x02
 			else
 				input_status_left = input_status_left & 0xFD
 			end
-			if(IsXInputKeyPress(2) or (lX < -steeringThreshold)) then --left-left
+			if(IsXInputKeyPress(pad_dpad_left) or (lX < -steeringThreshold)) then --left-left
 				input_status_left = input_status_left | 0x04
 			else
 				input_status_left = input_status_left & 0xFB
 			end
-			if(IsXInputKeyPress(3) or (lX > steeringThreshold)) then --right-right
+			if(IsXInputKeyPress(pad_dpad_right) or (lX > steeringThreshold)) then --right-right
 				input_status_left = input_status_left | 0x08
 			else
 				input_status_left = input_status_left & 0xF7
@@ -48,26 +65,26 @@ function manageXInputs(isInCar, isWalking)
 		end
 		--radio controls
 		if(isInCar) then
-			if(not(IsXInputKeyPress(0) or IsXInputKeyPress(1))) then
+			if(not(IsXInputKeyPress(pad_dpad_up) or IsXInputKeyPress(pad_dpad_down))) then
 				radio_change_pressed = false
 			end
 			if(radio_change_pressed == false) then
-				if(IsXInputKeyPress(0)) then
+				if(IsXInputKeyPress(pad_dpad_up)) then
 					SendInput(0x70) -- F1 - previous radio
 					radio_change_pressed = true
 				end
-				if(IsXInputKeyPress(1)) then
+				if(IsXInputKeyPress(pad_dpad_down)) then
 					SendInput(0x71) -- F2 - previous radio
 					radio_change_pressed = true
 				end
 			end
 		end
-		if((IsXInputKeyPress(15) and (not isInCar)) or IsXInputKeyPress(11)) then --ctrl-attack
+		if((IsXInputKeyPress(pad_right_trigger) and (not isInCar)) or IsXInputKeyPress(pad_b)) then --ctrl-attack
 			input_status_left = input_status_left | 0x10
 		else
 			input_status_left = input_status_left & 0xEF
 		end
-		if(IsXInputKeyPress(13)) then --enter-enter/exit
+		if(IsXInputKeyPress(pad_y)) then --enter-enter/exit
 			input_status_left = input_status_left | 0x20
 			if(exiting) then
 				SendInput(0x1B)
@@ -76,7 +93,7 @@ function manageXInputs(isInCar, isWalking)
 		else
 			input_status_left = input_status_left & 0xDF
 		end
-		if((IsXInputKeyPress(14) and (not isInCar)) or IsXInputKeyPress(10)) then --space-handbrake/jump
+		if((IsXInputKeyPress(pad_left_trigger) and (not isInCar)) or IsXInputKeyPress(pad_a)) then --space-handbrake/jump
 			input_status_left = input_status_left | 0x40
 			if(exiting) then
 				SendInput(0x0D)
@@ -86,22 +103,22 @@ function manageXInputs(isInCar, isWalking)
 		else
 			input_status_left = input_status_left & 0xBF
 		end
-		if(IsXInputKeyPress(8)) then --Z-previous weapon
+		if(IsXInputKeyPress(pad_left_shoulder)) then --Z-previous weapon
 			input_status_left = input_status_left | 0x80
 		else
 			input_status_left = input_status_left & 0x7F
 		end
-		if(IsXInputKeyPress(9)) then --X-next weapon
+		if(IsXInputKeyPress(pad_right_shoulder)) then --X-next weapon
 			input_status_right = input_status_right | 0x01
 		else
 			input_status_right = input_status_right & 0xFE
 		end
-		if(IsXInputKeyPress(7)) then --TAB-special 1
+		if(IsXInputKeyPress(pad_right_thumb)) then --TAB-special 1
 			input_status_right = input_status_right | 0x02
 		else
 			input_status_right = input_status_right & 0xFD
 		end
-		if(IsXInputKeyPress(5)) then --exiting
+		if(IsXInputKeyPress(pad_back)) then --exiting
 			input_status_right = input_status_right | 0x04
 			if(esc_pressed == false) then
 				esc_pressed = true
@@ -112,7 +129,7 @@ function manageXInputs(isInCar, isWalking)
 			input_status_right = input_status_right & 0xFB
 			esc_pressed = false
 		end
-		if(IsXInputKeyPress(4)) then --pause
+		if(IsXInputKeyPress(pad_start)) then --pause
 			if(pause_pressed == false) then
 				pause_pressed = true
 				SendInput(0x75)
@@ -120,7 +137,7 @@ function manageXInputs(isInCar, isWalking)
 		else
 			pause_pressed = false
 		end
-		if(IsXInputKeyPress(6) or IsXInputKeyPress(12) or (IsXInputKeyPress(14) and (not isInCar))) then --Left Alt-special 2
+		if(IsXInputKeyPress(pad_left_thumb) or IsXInputKeyPress(pad_x) or (IsXInputKeyPress(pad_left_trigger) and (not isInCar))) then --Left Alt-special 2
 			special = true
 			input_status_right = input_status_right | 0x04
 		else
@@ -219,17 +236,17 @@ function manageMenuXInputs()
 	local acceleratingThreshold = 0.3
 	local lX, lY, rX, rY = GetXInputAxes()
 	--left
-	SendMenuInput(0, IsXInputKeyPress(2) or (lX > acceleratingThreshold) or IsKeyPress(0x25))
+	SendMenuInput(0, IsXInputKeyPress(pad_dpad_left) or (lX > acceleratingThreshold) or IsKeyPress(0x25))
 	--right
-	SendMenuInput(1, IsXInputKeyPress(3) or (lX < -acceleratingThreshold) or IsKeyPress(0x27))
+	SendMenuInput(1, IsXInputKeyPress(pad_dpad_right) or (lX < -acceleratingThreshold) or IsKeyPress(0x27))
 	--up
-	SendMenuInput(2, IsXInputKeyPress(0) or (lY > acceleratingThreshold) or IsKeyPress(0x26))
+	SendMenuInput(2, IsXInputKeyPress(pad_dpad_up) or (lY > acceleratingThreshold) or IsKeyPress(0x26))
 	--down
-	SendMenuInput(3, IsXInputKeyPress(1) or (lY < -acceleratingThreshold) or IsKeyPress(0x28))
+	SendMenuInput(3, IsXInputKeyPress(pad_dpad_down) or (lY < -acceleratingThreshold) or IsKeyPress(0x28))
 	--enter
-	SendMenuInput(4, IsXInputKeyPress(10) or IsKeyPress(0x0D))
+	SendMenuInput(4, IsXInputKeyPress(pad_a) or IsKeyPress(0x0D))
 	--esc
-	SendMenuInput(5, IsXInputKeyPress(11) or IsKeyPress(0x1B))
+	SendMenuInput(5, IsXInputKeyPress(pad_b) or IsKeyPress(0x1B))
 end
 
 local gamestate = 0
@@ -286,19 +303,19 @@ while(true) do
 				local vertical = 0;
 				local horizontal = 0;
 				--up
-				if (IsKeyPress(0x26) or IsXInputKeyPress(0)) then
+				if (IsKeyPress(0x26) or IsXInputKeyPress(pad_dpad_up)) then
 					vertical = vertical + 1;
 				end
 				--down
-				if (IsKeyPress(0x28) or IsXInputKeyPress(1)) then
+				if (IsKeyPress(0x28) or IsXInputKeyPress(pad_dpad_down)) then
 					vertical = vertical - 1;
 				end
 				--right
-				if (IsKeyPress(0x27) or IsXInputKeyPress(2)) then
+				if (IsKeyPress(0x27) or IsXInputKeyPress(pad_dpad_right)) then
 					horizontal = horizontal + 1;
 				end
 				--left
-				if (IsKeyPress(0x25) or IsXInputKeyPress(3)) then
+				if (IsKeyPress(0x25) or IsXInputKeyPress(pad_dpad_left)) then
 					horizontal = horizontal - 1;
 				end
 				if(using_xinput_controller and ((math.abs(lX) > 0) or (math.abs(lY) > 0))) then
