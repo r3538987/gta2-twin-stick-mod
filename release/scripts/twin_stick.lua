@@ -1,13 +1,6 @@
---[[
--- Twin Stick MOD
--- MISI MOD for GTA2
---
--- Author: Dege
--- Date: 24 aug 2020
--- Mod version: v0.9
--- MISI since version: v0.5.0
+-- Twin Stick MOD (MISI mod for GTA2)
+-- Original author: Dege @ https://gtamp.com/forum/viewtopic.php?t=1150
 -- Description: Full controller support and twin stick mode
-]]--
 
 local exiting = false
 local special = false
@@ -236,9 +229,9 @@ function manageMenuXInputs()
 	local acceleratingThreshold = 0.3
 	local lX, lY, rX, rY = GetXInputAxes()
 	--left
-	SendMenuInput(0, IsXInputKeyPress(pad_dpad_left) or (lX > acceleratingThreshold) or IsKeyPress(0x25))
+	SendMenuInput(0, IsXInputKeyPress(pad_dpad_left) or (lX < -acceleratingThreshold) or IsKeyPress(0x25))
 	--right
-	SendMenuInput(1, IsXInputKeyPress(pad_dpad_right) or (lX < -acceleratingThreshold) or IsKeyPress(0x27))
+	SendMenuInput(1, IsXInputKeyPress(pad_dpad_right) or (lX > acceleratingThreshold) or IsKeyPress(0x27))
 	--up
 	SendMenuInput(2, IsXInputKeyPress(pad_dpad_up) or (lY > acceleratingThreshold) or IsKeyPress(0x26))
 	--down
