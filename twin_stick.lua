@@ -130,7 +130,7 @@ function manageXInputs(isInCar, isWalking)
 		else
 			pause_pressed = false
 		end
-		if(IsXInputKeyPress(pad_left_thumb) or IsXInputKeyPress(pad_x) or (IsXInputKeyPress(pad_left_trigger) and (not isInCar))) then --Left Alt-special 2
+		if(IsXInputKeyPress(pad_left_thumb) or IsXInputKeyPress(pad_x) --[[or (IsXInputKeyPress(pad_left_trigger) and (not isInCar))--]]) then --Left Alt-special 2
 			special = true
 			input_status_right = input_status_right | 0x04
 		else
@@ -237,9 +237,9 @@ function manageMenuXInputs()
 	--down
 	SendMenuInput(3, IsXInputKeyPress(pad_dpad_down) or (lY < -acceleratingThreshold) or IsKeyPress(0x28))
 	--enter
-	SendMenuInput(4, IsXInputKeyPress(pad_a) or IsKeyPress(0x0D))
+	SendMenuInput(4, IsXInputKeyPress(pad_a) or IsKeyPress(0x0D)) --enter
 	--esc
-	SendMenuInput(5, IsXInputKeyPress(pad_b) or IsKeyPress(0x1B))
+	SendMenuInput(5, IsXInputKeyPress(pad_b) or IsKeyPress(0x1B)) --esc
 end
 
 local gamestate = 0
