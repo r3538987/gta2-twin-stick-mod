@@ -80,7 +80,7 @@ function manageXInputs(isInCar, isWalking)
 		if(IsXInputKeyPress(pad_y)) then --enter-enter/exit
 			input_status_left = input_status_left | 0x20
 			if(exiting) then
-				SendInput(0x1B)
+				SendInput(0x1B) --esc
 				exiting = false
 			end
 		else
@@ -89,7 +89,7 @@ function manageXInputs(isInCar, isWalking)
 		if((IsXInputKeyPress(pad_left_trigger) and (not isInCar)) or IsXInputKeyPress(pad_a)) then --space-handbrake/jump
 			input_status_left = input_status_left | 0x40
 			if(exiting) then
-				SendInput(0x0D)
+				SendInput(0x0D) --enter
 				exiting = false
 				wait(300)
 			end
@@ -115,7 +115,7 @@ function manageXInputs(isInCar, isWalking)
 			input_status_right = input_status_right | 0x04
 			if(esc_pressed == false) then
 				esc_pressed = true
-				SendInput(0x1B)
+				SendInput(0x1B) --esc
 				exiting = not exiting
 			end
 		else
@@ -125,7 +125,7 @@ function manageXInputs(isInCar, isWalking)
 		if(IsXInputKeyPress(pad_start)) then --pause
 			if(pause_pressed == false) then
 				pause_pressed = true
-				SendInput(0x75)
+				SendInput(0x75) --F6
 			end
 		else
 			pause_pressed = false
