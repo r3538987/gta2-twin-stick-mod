@@ -129,19 +129,17 @@ function manageXInputs(isInCar, isWalking)
 			end
 		else
 			pause_pressed = false
-		end
-		
-		if(IsXInputKeyPress(pad_left_thumb) and (not isInCar)) then --show location (onfoot only)
+		end	
+		if(IsXInputKeyPress(pad_left_thumb) or IsKeyPress(0x78)) then --show location
 			if(f9_pressed == false) then
 				f9_pressed = true
 				SendInput(0x78) -- F9
+				wait(33)
 			end
 		else
 			f9_pressed = false
 		end
-
-		if(IsXInputKeyPress(pad_left_thumb) or IsXInputKeyPress(pad_x) --[[or (IsXInputKeyPress(pad_left_trigger) and (not isInCar))--]]) then --Left Alt-special 2
-		-- if(IsXInputKeyPress(pad_x) --[[or (IsXInputKeyPress(pad_left_trigger) and (not isInCar))--]]) then --Left Alt-special 2
+		if(IsXInputKeyPress(pad_x) --[[or (IsXInputKeyPress(pad_left_trigger) and (not isInCar))--]]) then --Left Alt-special 2
 			special = true
 			input_status_right = input_status_right | 0x04
 		else
