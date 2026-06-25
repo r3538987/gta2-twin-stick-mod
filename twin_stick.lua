@@ -28,13 +28,17 @@ function manageXInputs(isInCar, isWalking)
 		local input_status_left = ReadProcessMemory(0x5ecacc, 1)
 		local input_status_right = ReadProcessMemory(0x5ecacd, 1)
 		local lX, lY, rX, rY = GetXInputAxes()
-		if(isInCar or special) then
-			if(IsXInputKeyPress(pad_right_trigger) or (lY > 0.9)) then --up-forward
+		
+		-- Check if the player ped on foot is controlling the camera with any D-pad button
+		local dpad_zoom = (not isInCar) and (IsXInputKeyPress(pad_dpad_up) or IsXInputKeyPress(pad_dpad_down) or IsXInputKeyPress(pad_dpad_left) or IsXInputKeyPress(pad_dpad_right))
+
+		if(isInCar or special or dpad_zoom) then
+			if(IsXInputKeyPress(pad_right_trigger) or (lY > 0.9) or (not isInCar and IsXInputKeyPress(pad_dpad_up))) then --up-forward / zoom
 				input_status_left = input_status_left | 0x01
 			else
 				input_status_left = input_status_left & 0xFE
 			end
-			if(IsXInputKeyPress(pad_left_trigger) or (lY < -0.9)) then --down-backwards
+			if(IsXInputKeyPress(pad_left_trigger) or (lY < -0.9) or (not isInCar and IsXInputKeyPress(pad_dpad_down))) then --down-backwards / zoom
 				input_status_left = input_status_left | 0x02
 			else
 				input_status_left = input_status_left & 0xFD
@@ -158,7 +162,9 @@ function manageXInputs(isInCar, isWalking)
 		else
 			f9_pressed = false
 		end
-		if(IsXInputKeyPress(pad_x)) then --Left Alt-special 2
+		
+		-- Activate Special 2 when holding X or using any D-pad direction on foot
+		if(IsXInputKeyPress(pad_x) or dpad_zoom) then --Left Alt-special 2
 			special = true
 			input_status_right = input_status_right | 0x04
 		else
