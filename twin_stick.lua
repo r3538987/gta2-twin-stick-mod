@@ -39,15 +39,31 @@ function manageXInputs(isInCar, isWalking)
 			else
 				input_status_left = input_status_left & 0xFD
 			end
-			if(IsXInputKeyPress(pad_dpad_left) or (lX < -steeringThreshold)) then --left-left
-				input_status_left = input_status_left | 0x04
+
+			-- automatic turret control with right stick when in car
+			if (isInCar and math.abs(rX) > steeringThreshold) then
+				if (rX < -steeringThreshold) then -- turret left
+					input_status_left = input_status_left | 0x04
+				else
+					input_status_left = input_status_left & 0xFB
+				end
+				if (rX > steeringThreshold) then -- turret right
+					input_status_left = input_status_left | 0x08
+				else
+					input_status_left = input_status_left & 0xF7
+				end
 			else
-				input_status_left = input_status_left & 0xFB
-			end
-			if(IsXInputKeyPress(pad_dpad_right) or (lX > steeringThreshold)) then --right-right
-				input_status_left = input_status_left | 0x08
-			else
-				input_status_left = input_status_left & 0xF7
+				-- regular steering with left stick or dpad
+				if(IsXInputKeyPress(pad_dpad_left) or (lX < -steeringThreshold)) then --left-left
+					input_status_left = input_status_left | 0x04
+				else
+					input_status_left = input_status_left & 0xFB
+				end
+				if(IsXInputKeyPress(pad_dpad_right) or (lX > steeringThreshold)) then --right-right
+					input_status_left = input_status_left | 0x08
+				else
+					input_status_left = input_status_left & 0xF7
+				end
 			end
 		else
 			--remove natural movement inputs
@@ -106,11 +122,14 @@ function manageXInputs(isInCar, isWalking)
 		else
 			input_status_right = input_status_right & 0xFE
 		end
-		if(IsXInputKeyPress(pad_right_thumb)) then --TAB-special 1
+
+		-- Auto TAB on right stick move
+		if(IsXInputKeyPress(pad_right_thumb) or (isInCar and math.abs(rX) > steeringThreshold)) then --TAB-special 1
 			input_status_right = input_status_right | 0x02
 		else
 			input_status_right = input_status_right & 0xFD
 		end
+
 		if(IsXInputKeyPress(pad_back)) then --exiting
 			input_status_right = input_status_right | 0x04
 			if(esc_pressed == false) then
@@ -139,7 +158,7 @@ function manageXInputs(isInCar, isWalking)
 		else
 			f9_pressed = false
 		end
-		if(IsXInputKeyPress(pad_x) --[[or (IsXInputKeyPress(pad_left_trigger) and (not isInCar))--]]) then --Left Alt-special 2
+		if(IsXInputKeyPress(pad_x)) then --Left Alt-special 2
 			special = true
 			input_status_right = input_status_right | 0x04
 		else
