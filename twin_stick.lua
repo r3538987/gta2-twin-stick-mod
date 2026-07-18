@@ -2,395 +2,472 @@
 -- Original author: Dege @ https://gtamp.com/forum/viewtopic.php?t=1150
 -- Description: Full controller support and twin stick mode
 
-local exiting = false
-local special = false
-local f7_pressed = false
-local f9_pressed = false
-local pad_dpad_up = 0
-local pad_dpad_down = 1
-local pad_dpad_left = 2
-local pad_dpad_right = 3
-local pad_start = 4
-local pad_back = 5
-local pad_left_thumb = 6
-local pad_right_thumb = 7
-local pad_left_shoulder = 8
-local pad_right_shoulder = 9
-local pad_a = 10
-local pad_b = 11
-local pad_x = 12
-local pad_y = 13
-local pad_left_trigger = 14
-local pad_right_trigger = 15
+-- === Constants ===
+local PAD = {
+	DPAD_UP = 0, DPAD_DOWN = 1, DPAD_LEFT = 2, DPAD_RIGHT = 3,
+	START = 4, BACK = 5, L_THUMB = 6, R_THUMB = 7,
+	L_SHOULDER = 8, R_SHOULDER = 9,
+	A = 10, B = 11, X = 12, Y = 13,
+	L_TRIGGER = 14, R_TRIGGER = 15
+}
 
-function manageXInputs(isInCar, isWalking)
-	local steeringThreshold = 0.5
-	local acceleratingThreshold = 0.3
-	if(GetXInputConnectedDevicesNumber() > 0) then
-		local input_status_left = ReadProcessMemory(0x5ecacc, 1)
-		local input_status_right = ReadProcessMemory(0x5ecacd, 1)
-		local lX, lY, rX, rY = GetXInputAxes()
-		local left_thumb_pressed = IsXInputKeyPress(pad_left_thumb)
-		local right_thumb_pressed = IsXInputKeyPress(pad_right_thumb)
-		local both_thumbs_pressed = left_thumb_pressed and right_thumb_pressed
-		
-		-- Check if the player ped on foot is controlling the camera with any D-pad button
-		local dpad_zoom = (not isInCar) and (IsXInputKeyPress(pad_dpad_up) or IsXInputKeyPress(pad_dpad_down) or IsXInputKeyPress(pad_dpad_left) or IsXInputKeyPress(pad_dpad_right))
+local KEYS = {
+	ENTER = 0x0D, ESC = 0x1B, SPACE = 0x20, CTRL = 0x11,
+	LEFT = 0x25, UP = 0x26, RIGHT = 0x27, DOWN = 0x28,
+	Z = 0x5A, X = 0x58,
+	F1 = 0x70, F2 = 0x71, F6 = 0x75, F7 = 0x76, F9 = 0x78
+}
 
-		if(isInCar or special or dpad_zoom) then
-			if(IsXInputKeyPress(pad_right_trigger) or (lY > 0.9) or (not isInCar and IsXInputKeyPress(pad_dpad_up))) then --up-forward / zoom
-				input_status_left = input_status_left | 0x01
-			else
-				input_status_left = input_status_left & 0xFE
-			end
-			if(IsXInputKeyPress(pad_left_trigger) or (lY < -0.9) or (not isInCar and IsXInputKeyPress(pad_dpad_down))) then --down-backwards / zoom
-				input_status_left = input_status_left | 0x02
-			else
-				input_status_left = input_status_left & 0xFD
-			end
+local MEM = {
+	INPUT_LEFT = 0x5ecacc,
+	INPUT_RIGHT = 0x5ecacd,
+	IS_IN_CAR = 0x5e20bc
+}
 
-			-- automatic turret control with right stick when in car
-			if (isInCar and math.abs(rX) > steeringThreshold) then
-				if (rX < -steeringThreshold) then -- turret left
-					input_status_left = input_status_left | 0x04
-				else
-					input_status_left = input_status_left & 0xFB
-				end
-				if (rX > steeringThreshold) then -- turret right
-					input_status_left = input_status_left | 0x08
-				else
-					input_status_left = input_status_left & 0xF7
-				end
-			else
-				-- regular steering with left stick or dpad
-				if(IsXInputKeyPress(pad_dpad_left) or (lX < -steeringThreshold)) then --left-left
-					input_status_left = input_status_left | 0x04
-				else
-					input_status_left = input_status_left & 0xFB
-				end
-				if(IsXInputKeyPress(pad_dpad_right) or (lX > steeringThreshold)) then --right-right
-					input_status_left = input_status_left | 0x08
-				else
-					input_status_left = input_status_left & 0xF7
-				end
-			end
-		else
-			--remove natural movement inputs
-			input_status_left = input_status_left & 0xF0
-			if(isWalking) then
-				input_status_left = input_status_left | 0x01
-			end
-		end
-		--radio controls
-		if(isInCar) then
-			if(not(IsXInputKeyPress(pad_dpad_up) or IsXInputKeyPress(pad_dpad_down))) then
-				radio_change_pressed = false
-			end
-			if(radio_change_pressed == false) then
-				if(IsXInputKeyPress(pad_dpad_up)) then
-					SendInput(0x70) -- F1 - previous radio
-					radio_change_pressed = true
-				end
-				if(IsXInputKeyPress(pad_dpad_down)) then
-					SendInput(0x71) -- F2 - previous radio
-					radio_change_pressed = true
-				end
-			end
-		end
-		if((IsXInputKeyPress(pad_right_trigger) and (not isInCar)) or IsXInputKeyPress(pad_b)) then --ctrl-attack
-			input_status_left = input_status_left | 0x10
-		else
-			input_status_left = input_status_left & 0xEF
-		end
-		if(IsXInputKeyPress(pad_y)) then --enter-enter/exit
-			input_status_left = input_status_left | 0x20
-			if(exiting) then
-				SendInput(0x1B) --esc
-				exiting = false
-			end
-		else
-			input_status_left = input_status_left & 0xDF
-		end
-		if((IsXInputKeyPress(pad_left_trigger) and (not isInCar)) or IsXInputKeyPress(pad_a)) then --space-handbrake/jump
-			input_status_left = input_status_left | 0x40
-			if(exiting) then
-				SendInput(0x0D) --enter
-				exiting = false
-				wait(300)
-			end
-		else
-			input_status_left = input_status_left & 0xBF
-		end
-		if(IsXInputKeyPress(pad_left_shoulder)) then --Z-previous weapon
-			input_status_left = input_status_left | 0x80
-		else
-			input_status_left = input_status_left & 0x7F
-		end
-		if(IsXInputKeyPress(pad_right_shoulder)) then --X-next weapon
-			input_status_right = input_status_right | 0x01
-		else
-			input_status_right = input_status_right & 0xFE
-		end
+-- Bit positions in GTA2's two input-status bytes.
+local INPUT = {
+	LEFT = {
+		UP = 0x01,
+		DOWN = 0x02,
+		LEFT = 0x04,
+		RIGHT = 0x08,
+		ATTACK = 0x10,
+		ENTER_EXIT = 0x20,
+		JUMP_HANDBRAKE = 0x40,
+		PREVIOUS_WEAPON = 0x80
+	},
+	RIGHT = {
+		NEXT_WEAPON = 0x01,
+		SPECIAL_1 = 0x02,
+		SPECIAL_2 = 0x04
+	}
+}
 
-		-- Auto TAB on right stick move
-		if((right_thumb_pressed and not both_thumbs_pressed) or (isInCar and math.abs(rX) > steeringThreshold)) then --TAB-special 1
-			input_status_right = input_status_right | 0x02
-		else
-			input_status_right = input_status_right & 0xFD
-		end
+local THRESHOLD = {
+	STEERING = 0.5,
+	MENU = 0.3,
+	FULL_AXIS = 0.9
+}
 
-		if(IsXInputKeyPress(pad_back)) then --exiting
-			input_status_right = input_status_right | 0x04
-			if(esc_pressed == false) then
-				esc_pressed = true
-				SendInput(0x1B) --esc
-				exiting = not exiting
-			end
-		else
-			input_status_right = input_status_right & 0xFB
-			esc_pressed = false
-		end
-		if(IsXInputKeyPress(pad_start)) then --pause
-			if(pause_pressed == false) then
-				pause_pressed = true
-				SendInput(0x75) --F6
-			end
-		else
-			pause_pressed = false
-		end	
-		-- Press both sticks to show the current region (F9).
-		if(both_thumbs_pressed or IsKeyPress(0x78)) then
-			if(f9_pressed == false) then
-				f9_pressed = true
-				SendInput(0x78) -- F9
-				wait(33)
-			end
-		else
-			f9_pressed = false
-		end
+local DPAD_BUTTONS = {
+	PAD.DPAD_UP,
+	PAD.DPAD_DOWN,
+	PAD.DPAD_LEFT,
+	PAD.DPAD_RIGHT
+}
 
-		-- Press only the left stick to show the mission/recent brief (F7).
-		-- Mark it as held during the combo so releasing the right stick does not fire F7.
-		local f7_key_pressed = IsKeyPress(0x76)
-		if(left_thumb_pressed or f7_key_pressed) then
-			if(f7_pressed == false and (not both_thumbs_pressed or f7_key_pressed)) then
-				SendInput(0x76) -- F7
-				wait(33)
-			end
-			f7_pressed = true
-		else
-			f7_pressed = false
+-- === Runtime State ===
+local state = {
+	exiting = false,
+	special = false,
+	escPressed = false,
+	pausePressed = false,
+	f7Pressed = false,
+	f9Pressed = false,
+	radioPressed = false,
+	gameState = 0,
+	ped = 0,
+	usingController = false,
+	controllerSyncRequired = true,
+	wasInCar = false
+}
+
+-- === General Helpers ===
+local function isPadPressed(button)
+	return IsXInputKeyPress(button)
+end
+
+local function setBit(value, mask, enabled)
+	if enabled then
+		return value | mask
+	end
+
+	return value & (0xFF - mask)
+end
+
+local function anyPadPressed(buttons)
+	for _, button in ipairs(buttons) do
+		if isPadPressed(button) then
+			return true
 		end
-		
-		-- Activate Special 2 when holding X or using any D-pad direction on foot
-		if(IsXInputKeyPress(pad_x) or dpad_zoom) then --Left Alt-special 2
-			special = true
-			input_status_right = input_status_right | 0x04
-		else
-			special = false
-			input_status_right = input_status_right & 0xFB
+	end
+
+	return false
+end
+
+local function angleFromAxes(horizontal, vertical)
+	local angle = math.deg(math.atan(vertical, horizontal)) + 90
+	if angle < 0 then
+		angle = angle + 360
+	end
+
+	return angle
+end
+
+-- === Controller Shortcuts ===
+local function manageRadioControls(isInCar)
+	if not isInCar then
+		return
+	end
+
+	local radioUp = isPadPressed(PAD.DPAD_UP)
+	local radioDown = isPadPressed(PAD.DPAD_DOWN)
+
+	if not radioUp and not radioDown then
+		state.radioPressed = false
+	end
+
+	if not state.radioPressed then
+		if radioUp then
+			SendInput(KEYS.F1) -- Previous radio station
+			state.radioPressed = true
 		end
-		WriteProcessMemory(0x5ecacc, input_status_left, 1)
-		WriteProcessMemory(0x5ecacd, input_status_right, 1)
+		if radioDown then
+			SendInput(KEYS.F2) -- Next radio station
+			state.radioPressed = true
+		end
 	end
 end
 
-function manageInputs(isInCar, isWalking)
-	local input_status = ReadProcessMemory(0x5ecacc, 1)
-	if(isInCar) then
-		if(IsKeyPress(0x26)) then --up-forward
-			input_status = input_status | 0x01
+local function manageThumbShortcuts(leftThumb, rightThumb)
+	local bothThumbs = leftThumb and rightThumb
+
+	-- Both stick buttons show the current region (F9).
+	if bothThumbs or IsKeyPress(KEYS.F9) then
+		if not state.f9Pressed then
+			state.f9Pressed = true
+			SendInput(KEYS.F9)
+			wait(33)
+		end
+	else
+		state.f9Pressed = false
+	end
+
+	-- Left stick alone shows the mission/recent brief (F7).
+	-- Latch it during the combo so releasing the right stick does not fire F7.
+	local f7KeyPressed = IsKeyPress(KEYS.F7)
+	if leftThumb or f7KeyPressed then
+		if not state.f7Pressed and (not bothThumbs or f7KeyPressed) then
+			SendInput(KEYS.F7)
+			wait(33)
+		end
+		state.f7Pressed = true
+	else
+		state.f7Pressed = false
+	end
+
+	return bothThumbs
+end
+
+-- === Gameplay Input Translation ===
+local function manageXInputs(isInCar, isWalking)
+	if GetXInputConnectedDevicesNumber() == 0 then
+		return
+	end
+
+	local inputLeft = ReadProcessMemory(MEM.INPUT_LEFT, 1)
+	local inputRight = ReadProcessMemory(MEM.INPUT_RIGHT, 1)
+	local leftX, leftY, rightX = GetXInputAxes()
+	local leftThumb = isPadPressed(PAD.L_THUMB)
+	local rightThumb = isPadPressed(PAD.R_THUMB)
+	local bothThumbs = manageThumbShortcuts(leftThumb, rightThumb)
+
+	-- On foot, the D-pad controls camera zoom while Special 2 is active.
+	local dpadZoom = not isInCar and anyPadPressed(DPAD_BUTTONS)
+
+	if isInCar or state.special or dpadZoom then
+		local movingUp = isPadPressed(PAD.R_TRIGGER)
+			or leftY > THRESHOLD.FULL_AXIS
+			or (not isInCar and isPadPressed(PAD.DPAD_UP))
+		local movingDown = isPadPressed(PAD.L_TRIGGER)
+			or leftY < -THRESHOLD.FULL_AXIS
+			or (not isInCar and isPadPressed(PAD.DPAD_DOWN))
+
+		inputLeft = setBit(inputLeft, INPUT.LEFT.UP, movingUp)
+		inputLeft = setBit(inputLeft, INPUT.LEFT.DOWN, movingDown)
+
+		-- The right stick controls the turret in a car; otherwise steer normally.
+		if isInCar and math.abs(rightX) > THRESHOLD.STEERING then
+			inputLeft = setBit(inputLeft, INPUT.LEFT.LEFT, rightX < -THRESHOLD.STEERING)
+			inputLeft = setBit(inputLeft, INPUT.LEFT.RIGHT, rightX > THRESHOLD.STEERING)
 		else
-			input_status = input_status & 0xFE
-		end
-		if(IsKeyPress(0x28)) then --down-backwards
-			input_status = input_status | 0x02
-		else
-			input_status = input_status & 0xFD
-		end
-		if(IsKeyPress(0x25)) then --left-left
-			input_status = input_status | 0x04
-		else
-			input_status = input_status & 0xFB
-		end
-		if(IsKeyPress(0x27)) then --right-right
-			input_status = input_status | 0x08
-		else
-			input_status = input_status & 0xF7
+			local steeringLeft = isPadPressed(PAD.DPAD_LEFT)
+				or leftX < -THRESHOLD.STEERING
+			local steeringRight = isPadPressed(PAD.DPAD_RIGHT)
+				or leftX > THRESHOLD.STEERING
+
+			inputLeft = setBit(inputLeft, INPUT.LEFT.LEFT, steeringLeft)
+			inputLeft = setBit(inputLeft, INPUT.LEFT.RIGHT, steeringRight)
 		end
 	else
-		--remove natural movement inputs
-		input_status = input_status & 0xF0
-		if(isWalking) then
-			input_status = input_status | 0x01
+		-- Remove the game's natural movement and apply scripted walking.
+		inputLeft = inputLeft & 0xF0
+		inputLeft = setBit(inputLeft, INPUT.LEFT.UP, isWalking)
+	end
+
+	manageRadioControls(isInCar)
+
+	local attacking = (isPadPressed(PAD.R_TRIGGER) and not isInCar)
+		or isPadPressed(PAD.B)
+	inputLeft = setBit(inputLeft, INPUT.LEFT.ATTACK, attacking)
+
+	local enteringOrExiting = isPadPressed(PAD.Y)
+	inputLeft = setBit(inputLeft, INPUT.LEFT.ENTER_EXIT, enteringOrExiting)
+	if enteringOrExiting and state.exiting then
+		SendInput(KEYS.ESC)
+		state.exiting = false
+	end
+
+	local jumpingOrBraking = (isPadPressed(PAD.L_TRIGGER) and not isInCar)
+		or isPadPressed(PAD.A)
+	inputLeft = setBit(inputLeft, INPUT.LEFT.JUMP_HANDBRAKE, jumpingOrBraking)
+	if jumpingOrBraking and state.exiting then
+		SendInput(KEYS.ENTER)
+		state.exiting = false
+		wait(300)
+	end
+
+	inputLeft = setBit(
+		inputLeft,
+		INPUT.LEFT.PREVIOUS_WEAPON,
+		isPadPressed(PAD.L_SHOULDER)
+	)
+	inputRight = setBit(
+		inputRight,
+		INPUT.RIGHT.NEXT_WEAPON,
+		isPadPressed(PAD.R_SHOULDER)
+	)
+
+	-- Right stick click activates Special 1; the two-stick shortcut suppresses it.
+	local specialOne = (rightThumb and not bothThumbs)
+		or (isInCar and math.abs(rightX) > THRESHOLD.STEERING)
+	inputRight = setBit(inputRight, INPUT.RIGHT.SPECIAL_1, specialOne)
+
+	if isPadPressed(PAD.BACK) then
+		inputRight = setBit(inputRight, INPUT.RIGHT.SPECIAL_2, true)
+		if not state.escPressed then
+			state.escPressed = true
+			SendInput(KEYS.ESC)
+			state.exiting = not state.exiting
 		end
-	end
-	if(IsKeyPress(0x11)) then --ctrl-attack
-		input_status = input_status | 0x10
 	else
-		input_status = input_status & 0xEF
+		inputRight = setBit(inputRight, INPUT.RIGHT.SPECIAL_2, false)
+		state.escPressed = false
 	end
-	if(IsKeyPress(0x0D)) then --enter-enter/exit
-		input_status = input_status | 0x20
+
+	if isPadPressed(PAD.START) then
+		if not state.pausePressed then
+			state.pausePressed = true
+			SendInput(KEYS.F6)
+		end
 	else
-		input_status = input_status & 0xDF
+		state.pausePressed = false
 	end
-	if(IsKeyPress(0x20)) then --space-handbrake/jump
-		input_status = input_status | 0x40
+
+	-- Holding X or a D-pad direction on foot activates Special 2.
+	state.special = isPadPressed(PAD.X) or dpadZoom
+	inputRight = setBit(inputRight, INPUT.RIGHT.SPECIAL_2, state.special)
+
+	WriteProcessMemory(MEM.INPUT_LEFT, inputLeft, 1)
+	WriteProcessMemory(MEM.INPUT_RIGHT, inputRight, 1)
+end
+
+local function manageKeyboardInputs(isInCar, isWalking)
+	local input = ReadProcessMemory(MEM.INPUT_LEFT, 1)
+
+	if isInCar then
+		input = setBit(input, INPUT.LEFT.UP, IsKeyPress(KEYS.UP))
+		input = setBit(input, INPUT.LEFT.DOWN, IsKeyPress(KEYS.DOWN))
+		input = setBit(input, INPUT.LEFT.LEFT, IsKeyPress(KEYS.LEFT))
+		input = setBit(input, INPUT.LEFT.RIGHT, IsKeyPress(KEYS.RIGHT))
 	else
-		input_status = input_status & 0xBF
+		-- Remove the game's natural movement and apply scripted walking.
+		input = input & 0xF0
+		input = setBit(input, INPUT.LEFT.UP, isWalking)
 	end
-	if(IsKeyPress(0x5A)) then --Z-previous weapon
-		input_status = input_status | 0x80
-	else
-		input_status = input_status & 0x7F
-	end
-	WriteProcessMemory(0x5ecacc, input_status, 1)
+
+	input = setBit(input, INPUT.LEFT.ATTACK, IsKeyPress(KEYS.CTRL))
+	input = setBit(input, INPUT.LEFT.ENTER_EXIT, IsKeyPress(KEYS.ENTER))
+	input = setBit(input, INPUT.LEFT.JUMP_HANDBRAKE, IsKeyPress(KEYS.SPACE))
+	input = setBit(input, INPUT.LEFT.PREVIOUS_WEAPON, IsKeyPress(KEYS.Z))
+
+	WriteProcessMemory(MEM.INPUT_LEFT, input, 1)
 	manageXInputs(isInCar, isWalking)
 end
 
-function manageSecondaryAngle(ped, update_primary)
-	local lX, lY, rX, rY = GetXInputAxes()
-	local vertical = rY
-	local horizontal = rX
-	if(rX ~= 0 or rY ~= 0) then
-		local angle = math.deg(math.atan(vertical, horizontal)) + 90
-		if(angle < 0) then
-			angle = angle + 360
-		end
-		SetPedSecondaryAngle(ped, angle)
-		if(update_primary) then
-			SetPedAngle(ped, angle)
-		end
-	else
-		if(lX ~= 0 or lY ~= 0) then
-			vertical = lY
-			horizontal = lX
-			local angle = math.deg(math.atan(vertical, horizontal)) + 90
-			if(angle < 0) then
-				angle = angle + 360
-			end
-			SetPedSecondaryAngle(ped, angle)
-			if(update_primary) then
-				SetPedAngle(ped, angle)
-			end
-		end
+-- === Twin-Stick Aiming ===
+local function manageSecondaryAngle(ped, updatePrimary)
+	local leftX, leftY, rightX, rightY = GetXInputAxes()
+	local horizontal = rightX
+	local vertical = rightY
+
+	if rightX == 0 and rightY == 0 then
+		horizontal = leftX
+		vertical = leftY
+	end
+
+	if horizontal == 0 and vertical == 0 then
+		return
+	end
+
+	local angle = angleFromAxes(horizontal, vertical)
+	SetPedSecondaryAngle(ped, angle)
+	if updatePrimary then
+		SetPedAngle(ped, angle)
 	end
 end
 
-function manageMenuXInputs()
-	local acceleratingThreshold = 0.3
-	local lX, lY, rX, rY = GetXInputAxes()
-	--left
-	SendMenuInput(0, IsXInputKeyPress(pad_dpad_left) or (lX < -acceleratingThreshold) or IsKeyPress(0x25))
-	--right
-	SendMenuInput(1, IsXInputKeyPress(pad_dpad_right) or (lX > acceleratingThreshold) or IsKeyPress(0x27))
-	--up
-	SendMenuInput(2, IsXInputKeyPress(pad_dpad_up) or (lY > acceleratingThreshold) or IsKeyPress(0x26))
-	--down
-	SendMenuInput(3, IsXInputKeyPress(pad_dpad_down) or (lY < -acceleratingThreshold) or IsKeyPress(0x28))
-	--enter
-	SendMenuInput(4, IsXInputKeyPress(pad_a) or IsKeyPress(0x0D)) --enter
-	--esc
-	SendMenuInput(5, IsXInputKeyPress(pad_b) or IsKeyPress(0x1B)) --esc
+-- === Menu Input ===
+local function manageMenuInputs()
+	local leftX, leftY = GetXInputAxes()
+
+	SendMenuInput(0, isPadPressed(PAD.DPAD_LEFT)
+		or leftX < -THRESHOLD.MENU or IsKeyPress(KEYS.LEFT))
+	SendMenuInput(1, isPadPressed(PAD.DPAD_RIGHT)
+		or leftX > THRESHOLD.MENU or IsKeyPress(KEYS.RIGHT))
+	SendMenuInput(2, isPadPressed(PAD.DPAD_UP)
+		or leftY > THRESHOLD.MENU or IsKeyPress(KEYS.UP))
+	SendMenuInput(3, isPadPressed(PAD.DPAD_DOWN)
+		or leftY < -THRESHOLD.MENU or IsKeyPress(KEYS.DOWN))
+	SendMenuInput(4, isPadPressed(PAD.A) or IsKeyPress(KEYS.ENTER))
+	SendMenuInput(5, isPadPressed(PAD.B) or IsKeyPress(KEYS.ESC))
 end
 
-local gamestate = 0
-local ped = 0
-local walk_speed = 256
-local using_xinput_controller = false;
-local was_in_car = false;
-local esc_pressed = false;
-local enter_pressed = false;
-local pause_pressed = false;
-local radio_change_pressed = false;
+-- === Player and Controller State ===
+local function findPlayerPed()
+	wait(100)
+	local candidate = 0
 
-while(true) do
-	if (GetGameFrame() > 0) then
-		if (gamestate == 0) then -- If start new game
-			wait(100)
-			for i = 1, 6, 1 do
-				ped = GetPedStruct(i)
-				x, y, z = GetPedPos(ped)
-				if (IsPedRangeOfPoint(ped, x, y, z, 0.5)) then
-					WriteInLog(string.format("ped index %d id %d struct %X\n",i,GetPedID(ped),ped))
-					break
-				end
-			end
-			gamestate = 1
+	for index = 1, 6 do
+		candidate = GetPedStruct(index)
+		local x, y, z = GetPedPos(candidate)
+		if IsPedRangeOfPoint(candidate, x, y, z, 0.5) then
+			WriteInLog(string.format(
+				"ped index %d id %d struct %X\n",
+				index,
+				GetPedID(candidate),
+				candidate
+			))
+			break
 		end
-		if (gamestate == 1 and ped ~= 0) then
-			local isInCar = ReadProcessMemory(0x5e20bc, 1) ~= 0
-			was_in_car = true
-			-- entering a car removes my override
-			if(using_xinput_controller) then
-				if(isInCar == false and was_in_car) then
-					EnablePedSecondaryAngle(ped)
-				elseif(isInCar and was_in_car == false) then
-					DisablePedSecondaryAngle(ped)
-				end
-			end
-			if(isInCar and was_in_car == false) then
-				was_in_car = true
-			elseif (isInCar == false and was_in_car) then
-				was_in_car = false
-			end
-			local isWalking = false
-			local lX, lY, rX, rY = GetXInputAxes()
-			local connectedXInputControllers = GetXInputConnectedDevicesNumber()
-			if ((connectedXInputControllers > 0) and using_xinput_controller == false) then
-				using_xinput_controller = true
-				EnablePedSecondaryAngle(ped)
-			elseif ((connectedXInputControllers == 0) and using_xinput_controller == true) then
-				using_xinput_controller = false
-				DisablePedSecondaryAngle(ped)
-			end
-			if ((not isInCar) and ((using_xinput_controller and (math.abs(lX) > 0 or math.abs(lY) > 0)) or (using_xinput_controller == false and(IsKeyPress(0x25) or IsKeyPress(0x26) or IsKeyPress(0x27) or IsKeyPress(0x28))))) then
-				local vertical = 0;
-				local horizontal = 0;
-				--up
-				if (IsKeyPress(0x26) or IsXInputKeyPress(pad_dpad_up)) then
-					vertical = vertical + 1;
-				end
-				--down
-				if (IsKeyPress(0x28) or IsXInputKeyPress(pad_dpad_down)) then
-					vertical = vertical - 1;
-				end
-				--right
-				if (IsKeyPress(0x27) or IsXInputKeyPress(pad_dpad_right)) then
-					horizontal = horizontal + 1;
-				end
-				--left
-				if (IsKeyPress(0x25) or IsXInputKeyPress(pad_dpad_left)) then
-					horizontal = horizontal - 1;
-				end
-				if(using_xinput_controller and ((math.abs(lX) > 0) or (math.abs(lY) > 0))) then
-					vertical = lY
-					horizontal = lX
-				end
-				if(vertical ~= 0 or horizontal ~= 0) then
-					local angle = math.deg(math.atan(vertical, horizontal)) + 90
-					if(angle < 0) then
-						angle = angle + 360
-					end
-					SetPedAngle(ped, angle)
-					isWalking = true
+	end
 
-					local maxSpeed = GetPedMaxSpeed(ped)
-					local localSpeed = math.sqrt(vertical * vertical + horizontal * horizontal)
-					SetPedSpeed(ped, maxSpeed * localSpeed)
-				end
-			end
-			if(using_xinput_controller) then
-				manageSecondaryAngle(ped, (not isInCar) and (not isWalking))
+	return candidate
+end
+
+local function updateCarState(ped, isInCar)
+	-- Entering a car removes the secondary-angle override.
+	if state.usingController then
+		if not isInCar and state.wasInCar then
+			EnablePedSecondaryAngle(ped)
+		elseif isInCar and not state.wasInCar then
+			DisablePedSecondaryAngle(ped)
+		end
+	end
+
+	state.wasInCar = isInCar
+end
+
+local function updateControllerConnection(ped, isInCar)
+	local controllerConnected = GetXInputConnectedDevicesNumber() > 0
+	if not state.controllerSyncRequired
+		and controllerConnected == state.usingController then
+		return
+	end
+
+	state.usingController = controllerConnected
+	state.controllerSyncRequired = false
+
+	-- Menus and loading screens can clear the game-side angle override even
+	-- while the same controller remains connected, so reapply the desired state.
+	if controllerConnected and not isInCar then
+		EnablePedSecondaryAngle(ped)
+	else
+		DisablePedSecondaryAngle(ped)
+	end
+end
+
+-- === On-Foot Movement ===
+local function getWalkingDirection(leftX, leftY)
+	local horizontal = 0
+	local vertical = 0
+
+	if IsKeyPress(KEYS.UP) or isPadPressed(PAD.DPAD_UP) then
+		vertical = vertical + 1
+	end
+	if IsKeyPress(KEYS.DOWN) or isPadPressed(PAD.DPAD_DOWN) then
+		vertical = vertical - 1
+	end
+	if IsKeyPress(KEYS.RIGHT) or isPadPressed(PAD.DPAD_RIGHT) then
+		horizontal = horizontal + 1
+	end
+	if IsKeyPress(KEYS.LEFT) or isPadPressed(PAD.DPAD_LEFT) then
+		horizontal = horizontal - 1
+	end
+
+	if state.usingController and (leftX ~= 0 or leftY ~= 0) then
+		horizontal = leftX
+		vertical = leftY
+	end
+
+	return horizontal, vertical
+end
+
+local function updateWalking(ped, isInCar, leftX, leftY)
+	if isInCar then
+		return false
+	end
+
+	local controllerMoving = state.usingController and (leftX ~= 0 or leftY ~= 0)
+	local keyboardMoving = not state.usingController and (
+		IsKeyPress(KEYS.LEFT)
+		or IsKeyPress(KEYS.UP)
+		or IsKeyPress(KEYS.RIGHT)
+		or IsKeyPress(KEYS.DOWN)
+	)
+	if not controllerMoving and not keyboardMoving then
+		return false
+	end
+
+	local horizontal, vertical = getWalkingDirection(leftX, leftY)
+	if horizontal == 0 and vertical == 0 then
+		return false
+	end
+
+	SetPedAngle(ped, angleFromAxes(horizontal, vertical))
+
+	local directionMagnitude = math.sqrt(vertical * vertical + horizontal * horizontal)
+	SetPedSpeed(ped, GetPedMaxSpeed(ped) * directionMagnitude)
+	return true
+end
+
+-- === Main Loop ===
+while true do
+	if GetGameFrame() > 0 then
+		if state.gameState == 0 then
+			state.ped = findPlayerPed()
+			state.gameState = 1
+		end
+
+		if state.gameState == 1 and state.ped ~= 0 then
+			local isInCar = ReadProcessMemory(MEM.IS_IN_CAR, 1) ~= 0
+			local leftX, leftY = GetXInputAxes()
+
+			updateCarState(state.ped, isInCar)
+			updateControllerConnection(state.ped, isInCar)
+
+			local isWalking = updateWalking(state.ped, isInCar, leftX, leftY)
+			if state.usingController then
+				manageSecondaryAngle(state.ped, not isInCar and not isWalking)
 				manageXInputs(isInCar, isWalking)
 			else
-				manageInputs(isInCar, isWalking)
+				manageKeyboardInputs(isInCar, isWalking)
 			end
 		end
 	else
-		gamestate = 0 -- If not frame to game restart or game not loaded
-		exiting = false
-		manageMenuXInputs()
+		state.gameState = 0
+		state.exiting = false
+		state.controllerSyncRequired = true
+		manageMenuInputs()
 	end
 end
