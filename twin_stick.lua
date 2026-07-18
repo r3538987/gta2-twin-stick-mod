@@ -4,6 +4,8 @@
 
 local exiting = false
 local special = false
+local f7_pressed = false
+local f9_pressed = false
 local pad_dpad_up = 0
 local pad_dpad_down = 1
 local pad_dpad_left = 2
@@ -28,6 +30,9 @@ function manageXInputs(isInCar, isWalking)
 		local input_status_left = ReadProcessMemory(0x5ecacc, 1)
 		local input_status_right = ReadProcessMemory(0x5ecacd, 1)
 		local lX, lY, rX, rY = GetXInputAxes()
+		local left_thumb_pressed = IsXInputKeyPress(pad_left_thumb)
+		local right_thumb_pressed = IsXInputKeyPress(pad_right_thumb)
+		local both_thumbs_pressed = left_thumb_pressed and right_thumb_pressed
 		
 		-- Check if the player ped on foot is controlling the camera with any D-pad button
 		local dpad_zoom = (not isInCar) and (IsXInputKeyPress(pad_dpad_up) or IsXInputKeyPress(pad_dpad_down) or IsXInputKeyPress(pad_dpad_left) or IsXInputKeyPress(pad_dpad_right))
@@ -128,7 +133,7 @@ function manageXInputs(isInCar, isWalking)
 		end
 
 		-- Auto TAB on right stick move
-		if(IsXInputKeyPress(pad_right_thumb) or (isInCar and math.abs(rX) > steeringThreshold)) then --TAB-special 1
+		if((right_thumb_pressed and not both_thumbs_pressed) or (isInCar and math.abs(rX) > steeringThreshold)) then --TAB-special 1
 			input_status_right = input_status_right | 0x02
 		else
 			input_status_right = input_status_right & 0xFD
@@ -153,7 +158,8 @@ function manageXInputs(isInCar, isWalking)
 		else
 			pause_pressed = false
 		end	
-		if(IsXInputKeyPress(pad_left_thumb) or IsKeyPress(0x78)) then --show location
+		-- Press both sticks to show the current region (F9).
+		if(both_thumbs_pressed or IsKeyPress(0x78)) then
 			if(f9_pressed == false) then
 				f9_pressed = true
 				SendInput(0x78) -- F9
@@ -161,6 +167,19 @@ function manageXInputs(isInCar, isWalking)
 			end
 		else
 			f9_pressed = false
+		end
+
+		-- Press only the left stick to show the mission/recent brief (F7).
+		-- Mark it as held during the combo so releasing the right stick does not fire F7.
+		local f7_key_pressed = IsKeyPress(0x76)
+		if(left_thumb_pressed or f7_key_pressed) then
+			if(f7_pressed == false and (not both_thumbs_pressed or f7_key_pressed)) then
+				SendInput(0x76) -- F7
+				wait(33)
+			end
+			f7_pressed = true
+		else
+			f7_pressed = false
 		end
 		
 		-- Activate Special 2 when holding X or using any D-pad direction on foot
@@ -284,7 +303,6 @@ local was_in_car = false;
 local esc_pressed = false;
 local enter_pressed = false;
 local pause_pressed = false;
-local f9_pressed = false
 local radio_change_pressed = false;
 
 while(true) do
