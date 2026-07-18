@@ -11,3 +11,4 @@ Original  authors:
 - [MISI fork and original TwinStick release](https://gtamp.com/forum/viewtopic.php?t=1150) : Dege, robotanarchy, Sektor 
 
 ![Gamepad-layout](GTA2-gamepad-controls-layout.png)
+PNG file now has diagram included, so it can be imported and edited via DrawIO app. 
